@@ -55,6 +55,8 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+/assets/.env
+**/assets/.env
 *.pem
 *.key
 *.crt
@@ -65,6 +67,10 @@ app.*.map.json
 **/dist/
 node_modules/
 .firebase/
+/build/web/
+**/build/web/
+web/build/
+**/web/build/
 
 # OS files
 Thumbs.db

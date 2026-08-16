@@ -5,16 +5,7 @@ services:
     env: static
     plan: free
     region: oregon
-    buildCommand: |
-      set -eux
-      curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.4-stable.tar.xz -o flutter.tar.xz
-      tar -xf flutter.tar.xz -C /tmp
-      export PATH="/tmp/flutter/bin:$PATH"
-      flutter channel stable
-      flutter upgrade
-      flutter config --enable-web
-      flutter pub get
-      flutter build web --release
+    buildCommand: ./build.sh
     staticPublishPath: ./build/web
     autoDeploy: true
     envVars:

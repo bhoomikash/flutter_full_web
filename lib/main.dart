@@ -1251,10 +1251,15 @@ class _CollegeFestDashboardState extends State<CollegeFestDashboard> {
 
                           if (success) {
                             final registered = event.registerStudent();
+                            final isDemoMode = !_hasSupabaseConfig();
                             if (registered) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Registration successful'),
+                                SnackBar(
+                                  content: Text(
+                                    isDemoMode
+                                        ? 'Registration successful in demo mode.'
+                                        : 'Registration successful',
+                                  ),
                                 ),
                               );
                             } else {
@@ -1303,6 +1308,17 @@ class _CollegeFestDashboardState extends State<CollegeFestDashboard> {
     );
   }
 
+  bool _hasSupabaseConfig() {
+    final supabaseUrl =
+        dotenv.env['SUPABASE_URL'] ??
+        const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+    final supabaseKey =
+        dotenv.env['SUPABASE_KEY'] ??
+        const String.fromEnvironment('SUPABASE_KEY', defaultValue: '');
+
+    return supabaseUrl.isNotEmpty && supabaseKey.isNotEmpty;
+  }
+
   Future<bool> _submitRegistration({
     required TechnicalEvent event,
     required String studentName,
@@ -1318,37 +1334,52 @@ class _CollegeFestDashboardState extends State<CollegeFestDashboard> {
         const String.fromEnvironment('SUPABASE_KEY', defaultValue: '');
 
     if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Supabase credentials are not configured.'),
-        ),
+      debugPrint(
+        'Supabase credentials are not configured. Falling back to demo-mode registration.',
       );
-      return false;
+      return true;
     }
 
     final uri = Uri.parse('$supabaseUrl/rest/v1/registrations');
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': 'Bearer $supabaseKey',
-        'Prefer': 'return=representation',
-      },
-      body: jsonEncode({
-        'student_name': studentName.trim(),
-        'phone_number': phoneNumber.trim(),
-        'college': collegeName.trim(),
-        'email_address': emailAddress.trim(),
-        'event_title': event.title,
-        'event_venue': event.venue,
-        'event_type': event.runtimeType.toString(),
-        'registered_at': DateTime.now().toUtc().toIso8601String(),
-      }),
-    );
 
-    return response.statusCode == 201;
+    try {
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': 'Bearer $supabaseKey',
+              'Prefer': 'return=representation',
+            },
+            body: jsonEncode({
+              'student_name': studentName.trim(),
+              'phone_number': phoneNumber.trim(),
+              'college': collegeName.trim(),
+              'email_address': emailAddress.trim(),
+              'event_title': event.title,
+              'event_venue': event.venue,
+              'event_type': event.runtimeType.toString(),
+              'registered_at': DateTime.now().toUtc().toIso8601String(),
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 201) {
+        return true;
+      }
+
+      debugPrint(
+        'Supabase registration failed: ${response.statusCode} ${response.body}',
+      );
+      return false;
+    } on TimeoutException catch (error) {
+      debugPrint('Supabase registration timed out: $error');
+      return false;
+    } catch (error) {
+      debugPrint('Supabase registration error: $error');
+      return false;
+    }
   }
 }
 
